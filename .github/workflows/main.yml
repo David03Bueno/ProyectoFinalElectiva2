@@ -1,0 +1,80 @@
+name: CI/CD - Test, Build, Push & Deploy
+
+on:
+  push:
+    branches: [ "main" ]
+
+concurrency:
+  group: prod-deploy
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Run Unit Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .   # 👈 ajusta si tu proyecto está en subcarpeta
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install deps
+        run: npm ci   # 👈 instala con lockfile, incluye devDependencies
+
+      - name: Run tests
+        run: npx jest --coverage --runInBand   # 👈 ejecuta Jest con npx
+
+  build_and_push:
+    name: Build & Push Docker Image
+    needs: test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .   # 👈 ajusta si tu proyecto está en subcarpeta
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Docker login
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set image tags
+        id: meta
+        run: |
+          echo "IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/devops-ci-cd-final" >> $GITHUB_OUTPUT
+          echo "TAG_SHA=${GITHUB_SHA}" >> $GITHUB_OUTPUT
+          echo "TAG_LATEST=latest" >> $GITHUB_OUTPUT
+
+      - name: Build & push (BuildKit)
+        uses: docker/build-push-action@v6
+        with:
+          context: .   # 👈 ajusta si tu proyecto está en subcarpeta
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.IMAGE }}:${{ steps.meta.outputs.TAG_LATEST }}
+            ${{ steps.meta.outputs.IMAGE }}:${{ steps.meta.outputs.TAG_SHA }}
+          cache-from: type=registry,ref=${{ steps.meta.outputs.IMAGE }}:latest
+          cache-to: type=inline
+
+  deploy_render:
+    name: Deploy to Render
+    needs: build_and_push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render Deploy
+        run: |
+          curl -X POST \
+            -H "Accept: application/json" \
+            -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            --data '{"clearCache": false}' \
+            https://api.render.com/v1/services/${{ secrets.RENDER_SERVICE_ID }}/deploys
