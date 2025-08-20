@@ -12,6 +12,9 @@ jobs:
   test:
     name: Run Unit Tests
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .   # 👈 ajusta si tu proyecto está en subcarpeta
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,15 +25,18 @@ jobs:
           node-version: 18
 
       - name: Install deps
-        run: npm install
+        run: npm ci   # 👈 instala con lockfile, incluye devDependencies
 
       - name: Run tests
-        run: npm test
+        run: npx jest --coverage --runInBand   # 👈 ejecuta Jest con npx
 
   build_and_push:
     name: Build & Push Docker Image
     needs: test
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .   # 👈 ajusta si tu proyecto está en subcarpeta
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -51,7 +57,7 @@ jobs:
       - name: Build & push (BuildKit)
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: .   # 👈 ajusta si tu proyecto está en subcarpeta
           push: true
           tags: |
             ${{ steps.meta.outputs.IMAGE }}:${{ steps.meta.outputs.TAG_LATEST }}
