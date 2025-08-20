@@ -1,0 +1,17 @@
+{
+  "name": "devops-ci-cd-final",
+  "version": "1.0.0",
+  "description": "Practica final DevOps CI/CD con GitHub Actions",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "jest --coverage --runInBand"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^6.3.4"
+  }
+}
